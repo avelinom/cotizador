@@ -34,9 +34,11 @@ import {
   Download as DownloadIcon,
   PictureAsPdf as PdfIcon,
   EditNote as EditNoteIcon,
+  Style as StyleIcon,
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import { useProposals, Proposal, ProposalSection } from '../hooks/useProposals';
+import { useTemplates, Template } from '../hooks/useTemplates';
 import { formatDate } from '../utils/dateFormatter';
 
 const ProposalsPage = () => {
@@ -50,12 +52,22 @@ const ProposalsPage = () => {
     exportToWord,
     exportToPDF,
     fetchProposals,
+    getProposal,
   } = useProposals();
+
+  const {
+    templates,
+    loading: templatesLoading,
+    error: templatesError,
+    applyTemplate,
+    fetchTemplates,
+  } = useTemplates();
 
   const [isClient, setIsClient] = useState(false);
   const [openUploadModal, setOpenUploadModal] = useState(false);
   const [openViewModal, setOpenViewModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
+  const [openTemplateModal, setOpenTemplateModal] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [selectedSection, setSelectedSection] = useState<ProposalSection | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -209,6 +221,42 @@ const ProposalsPage = () => {
     exportToPDF(id);
   };
 
+  const handleOpenTemplateModal = (proposal: Proposal) => {
+    setSelectedProposal(proposal);
+    setError(null);
+    fetchTemplates();
+    setOpenTemplateModal(true);
+  };
+
+  const handleCloseTemplateModal = () => {
+    setOpenTemplateModal(false);
+    setSelectedProposal(null);
+  };
+
+  const handleApplyTemplate = async (templateId: number) => {
+    if (!selectedProposal) return;
+
+    try {
+      setError(null);
+      const result = await applyTemplate(selectedProposal.id, templateId);
+      if (result.success) {
+        setSuccess(result.message || 'Template aplicado exitosamente');
+        setOpenTemplateModal(false);
+        await fetchProposals();
+        // Refresh selected proposal by fetching it again
+        const updatedProposal = await getProposal(selectedProposal.id);
+        if (updatedProposal) {
+          setSelectedProposal(updatedProposal);
+        }
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError(result.message || 'Error al aplicar el template');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al aplicar el template');
+    }
+  };
+
   if (!isClient) {
     return (
       <Layout title="Cotizador">
@@ -318,6 +366,14 @@ const ProposalsPage = () => {
                         </IconButton>
                         <IconButton
                           size="small"
+                          color="secondary"
+                          onClick={() => handleOpenTemplateModal(proposal)}
+                          title="Aplicar template"
+                        >
+                          <StyleIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           color="info"
                           onClick={() => handleExportWord(proposal.id)}
                           title="Exportar a Word"
@@ -404,7 +460,15 @@ const ProposalsPage = () => {
         <Dialog open={openViewModal} onClose={() => setOpenViewModal(false)} maxWidth="lg" fullWidth>
           <DialogTitle>
             {selectedProposal?.title}
-            <Box display="flex" gap={1} mt={1}>
+            <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<StyleIcon />}
+                onClick={() => selectedProposal && handleOpenTemplateModal(selectedProposal)}
+              >
+                Aplicar Template
+              </Button>
               <Button
                 size="small"
                 variant="outlined"
@@ -563,6 +627,87 @@ const ProposalsPage = () => {
             <Button onClick={handleSaveSection} variant="contained" color="primary">
               Guardar Cambios
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={openTemplateModal} onClose={handleCloseTemplateModal} maxWidth="md" fullWidth>
+          <DialogTitle>
+            Aplicar Template a: {selectedProposal?.title}
+          </DialogTitle>
+          <DialogContent>
+            {(templatesError || error) && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => { setError(null); }}>
+                {templatesError || error}
+              </Alert>
+            )}
+            {templatesLoading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+              </Box>
+            ) : templates.length === 0 ? (
+              <Typography variant="body2" color="textSecondary" align="center">
+                No hay templates disponibles.
+              </Typography>
+            ) : (
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {templates.map((template) => (
+                  <Grid item xs={12} key={template.id}>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        },
+                        borderColor: template.is_default ? 'primary.main' : 'divider',
+                        borderWidth: template.is_default ? 2 : 1,
+                      }}
+                      onClick={() => handleApplyTemplate(template.id)}
+                    >
+                      <CardContent>
+                        <Box display="flex" justifyContent="space-between" alignItems="start">
+                          <Box flex={1}>
+                            <Typography variant="h6" component="h3" gutterBottom>
+                              {template.name}
+                              {template.is_default && (
+                                <Chip
+                                  label="Por defecto"
+                                  size="small"
+                                  color="primary"
+                                  sx={{ ml: 1 }}
+                                />
+                              )}
+                            </Typography>
+                            {template.description && (
+                              <Typography variant="body2" color="textSecondary" paragraph>
+                                {template.description}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="textSecondary">
+                              {template.sections?.length || 0} secciones
+                            </Typography>
+                          </Box>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApplyTemplate(template.id);
+                            }}
+                          >
+                            Aplicar
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseTemplateModal}>Cancelar</Button>
           </DialogActions>
         </Dialog>
       </Layout>

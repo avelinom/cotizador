@@ -15,6 +15,7 @@ const notFound = require('./middleware/notFound');
 // Import routes
 const authRoutes = require('./routes/auth');
 const proposalsRoutes = require('./routes/proposals');
+const templatesRoutes = require('./routes/templates');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/proposals', proposalsRoutes);
+app.use('/api/templates', templatesRoutes);
 
 // Error handling middleware
 app.use(notFound);
