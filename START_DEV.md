@@ -3,7 +3,7 @@
 ## Configuración de Puertos
 
 - **Backend**: Puerto 3005
-- **Frontend**: Puerto 3004
+- **Frontend**: Puerto 3006 (cambiado de 3004 porque está ocupado por CefiroAzurePortal)
 
 ## Credenciales de Acceso
 
@@ -29,11 +29,11 @@ cd /Users/amiguelez/GitHub/cotizador/frontend
 npm run dev
 ```
 
-El frontend estará disponible en: http://localhost:3004
+El frontend estará disponible en: http://localhost:3006
 
 ## Verificar que todo funciona
 
-1. Abre http://localhost:3004 en tu navegador
+1. Abre http://localhost:3006 en tu navegador
 2. Inicia sesión con las credenciales de admin
 3. Deberías ver la página de propuestas
 
@@ -50,6 +50,13 @@ El frontend estará disponible en: http://localhost:3004
 - **3001**: Healthynola Backend
 - **3002**: BeWealth
 - **3003**: Cefiro Azure Portal
-- **3004**: Cotizador Frontend ✅
+- **3004**: Cefiro Azure Portal (ocupado)
 - **3005**: Cotizador Backend ✅
+- **3006**: Cotizador Frontend ✅
 
+## Nota Importante
+
+Si ves el error "Ruta no encontrada" asegúrate de:
+1. ✅ Backend corriendo en puerto 3005
+2. ✅ Frontend corriendo en puerto 3006
+3. ✅ Acceder a http://localhost:3006 (NO 3004)
