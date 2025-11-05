@@ -241,9 +241,8 @@ const uploadProposal = async (req, res) => {
       });
     }
     
-    const { title, description, company_id } = req.body;
+    const { title, description } = req.body;
     const userId = req.user.id;
-    const userRole = req.user.role;
     
     if (!title) {
       return res.status(400).json({
@@ -262,7 +261,6 @@ const uploadProposal = async (req, res) => {
       original_filename: req.file.originalname,
       file_path: `/uploads/proposals/${req.file.filename}`,
       user_id: userId,
-      company_id: null,
       sections: JSON.stringify(processed.sections),
       metadata: JSON.stringify(processed.metadata),
       created_at: new Date(),

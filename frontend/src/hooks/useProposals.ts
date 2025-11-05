@@ -18,7 +18,6 @@ export interface Proposal {
   original_filename: string;
   file_path?: string;
   user_id: number;
-  company_id?: number;
   sections: ProposalSection[];
   metadata?: {
     margins: {
@@ -34,7 +33,6 @@ export interface Proposal {
   created_at: string;
   updated_at: string;
   user_name?: string;
-  company_name?: string;
 }
 
 export const useProposals = () => {
