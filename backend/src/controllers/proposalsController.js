@@ -267,9 +267,13 @@ const uploadProposal = async (req, res) => {
       updated_at: new Date()
     }).returning('*');
     
-    // Parse JSON fields for response
-    proposal.sections = JSON.parse(proposal.sections);
-    proposal.metadata = JSON.parse(proposal.metadata);
+    // Parse JSON fields for response (PostgreSQL JSONB already returns objects)
+    if (typeof proposal.sections === 'string') {
+      proposal.sections = JSON.parse(proposal.sections);
+    }
+    if (typeof proposal.metadata === 'string') {
+      proposal.metadata = JSON.parse(proposal.metadata);
+    }
     
     res.status(201).json({
       success: true,
@@ -333,9 +337,13 @@ const updateProposal = async (req, res) => {
       .update(updateData)
       .returning('*');
     
-    // Parse JSON fields for response
-    updatedProposal.sections = JSON.parse(updatedProposal.sections);
-    updatedProposal.metadata = JSON.parse(updatedProposal.metadata);
+    // Parse JSON fields for response (PostgreSQL JSONB already returns objects)
+    if (typeof updatedProposal.sections === 'string') {
+      updatedProposal.sections = JSON.parse(updatedProposal.sections);
+    }
+    if (typeof updatedProposal.metadata === 'string') {
+      updatedProposal.metadata = JSON.parse(updatedProposal.metadata);
+    }
     
     res.json({
       success: true,
@@ -377,8 +385,10 @@ const updateSection = async (req, res) => {
       });
     }
     
-    // Parse sections
-    const sections = JSON.parse(proposal.sections);
+    // Parse sections (PostgreSQL JSONB already returns objects)
+    const sections = typeof proposal.sections === 'string' 
+      ? JSON.parse(proposal.sections) 
+      : proposal.sections;
     
     // Find and update section
     const sectionIndex = sections.findIndex(s => s.id === parseInt(sectionId));
@@ -494,8 +504,13 @@ const exportToWord = async (req, res) => {
       });
     }
     
-    const sections = JSON.parse(proposal.sections);
-    const metadata = JSON.parse(proposal.metadata);
+    // PostgreSQL JSONB already returns objects
+    const sections = typeof proposal.sections === 'string' 
+      ? JSON.parse(proposal.sections) 
+      : proposal.sections;
+    const metadata = typeof proposal.metadata === 'string' 
+      ? JSON.parse(proposal.metadata) 
+      : proposal.metadata;
     
     // Create Word document
     const doc = new Document({
@@ -579,8 +594,13 @@ const exportToPDF = async (req, res) => {
       });
     }
     
-    const sections = JSON.parse(proposal.sections);
-    const metadata = JSON.parse(proposal.metadata);
+    // PostgreSQL JSONB already returns objects
+    const sections = typeof proposal.sections === 'string' 
+      ? JSON.parse(proposal.sections) 
+      : proposal.sections;
+    const metadata = typeof proposal.metadata === 'string' 
+      ? JSON.parse(proposal.metadata) 
+      : proposal.metadata;
     
     // Create PDF
     const doc = new PDFDocument({
