@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../services/api';
 
 export interface ProposalSection {
   id: number;
@@ -45,12 +46,6 @@ export const useProposals = () => {
     return localStorage.getItem('cotizador_token');
   };
 
-  const getApiBaseUrl = (): string => {
-    if (typeof window !== 'undefined') {
-      return process.env.NEXT_PUBLIC_API_URL || '/api';
-    }
-    return '/api';
-  };
 
   const fetchProposals = async () => {
     try {

@@ -17,12 +17,6 @@ build/
 .next/
 out/
 
-# Uploads
-uploads/
-*.docx
-*.doc
-*.pdf
-
 # IDE
 .vscode/
 .idea/
@@ -38,15 +32,19 @@ Thumbs.db
 logs/
 *.log
 
-# Testing
-coverage/
-.nyc_output/
+# Uploads
+uploads/
+backend/uploads/
+frontend/uploads/
 
 # Database
 *.sqlite
 *.db
 
-# Misc
-.cache/
-.temp/
+# Coverage
+coverage/
+.nyc_output/
 
+# Temporary files
+tmp/
+temp/

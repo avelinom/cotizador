@@ -1,4 +1,4 @@
-const getApiBaseUrl = () => {
+export const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     return process.env.NEXT_PUBLIC_API_URL || '/api';
   }
