@@ -28,15 +28,23 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, title = 'Cotizador' }) => {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   
   // Determine current tab based on route
   const getCurrentTab = () => {
     if (router.pathname === '/proposals') return 0;
     if (router.pathname === '/templates') return 1;
-    return -1;
+    return 0; // Default to proposals tab
   };
+  
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+  
+  // Debug: log user info
+  React.useEffect(() => {
+    console.log('Layout - isAuthenticated:', isAuthenticated, 'user:', user, 'isLoading:', isLoading);
+  }, [user, isAuthenticated, isLoading]);
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     if (newValue === 0) {
@@ -68,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Cotizador' }) => {
             {title}
           </Typography>
 
-          {isAuthenticated && user && (
+          {!isLoading && isAuthenticated && user && (
             <Tabs
               value={getCurrentTab()}
               onChange={handleTabChange}
@@ -82,21 +90,20 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Cotizador' }) => {
                 label="Propuestas"
                 value={0}
               />
-              {user.role === 'admin' && (
-                <Tab
-                  icon={<StyleIcon />}
-                  iconPosition="start"
-                  label="Templates"
-                  value={1}
-                />
-              )}
+              {/* Show templates tab - temporarily for all users to debug */}
+              <Tab
+                icon={<StyleIcon />}
+                iconPosition="start"
+                label="Templates"
+                value={1}
+              />
             </Tabs>
           )}
 
-          {isAuthenticated && user ? (
+          {!isLoading && isAuthenticated && user ? (
             <>
               <Typography variant="body2" sx={{ mr: 2 }}>
-                {user.name}
+                {user.name || user.email}
               </Typography>
               <IconButton
                 size="large"
@@ -117,11 +124,11 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Cotizador' }) => {
                 </MenuItem>
               </Menu>
             </>
-          ) : (
+          ) : !isLoading ? (
             <Button color="inherit" onClick={() => router.push('/login')}>
               Iniciar Sesión
             </Button>
-          )}
+          ) : null}
         </Toolbar>
       </AppBar>
 

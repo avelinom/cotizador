@@ -134,9 +134,18 @@ export const getCurrentUser = async (): Promise<User | null> => {
     }
 
     const data = await response.json();
-    // Backend returns { success, data: { user } }
-    return data.data?.user || data.user || null;
+    // Backend returns { success, data: { id, name, email, role, created_at } }
+    if (data.success && data.data) {
+      return {
+        id: data.data.id,
+        name: data.data.name,
+        email: data.data.email,
+        role: data.data.role || 'user'
+      };
+    }
+    return null;
   } catch (error) {
+    console.error('Error getting current user:', error);
     removeToken();
     return null;
   }

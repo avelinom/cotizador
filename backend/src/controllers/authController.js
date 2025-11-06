@@ -147,7 +147,13 @@ const getMe = async (req, res) => {
 
     res.json({
       success: true,
-      data: user
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role || 'user',
+        created_at: user.created_at
+      }
     });
   } catch (error) {
     logger.error('Error getting user:', error);

@@ -35,8 +35,15 @@ export const useAuth = () => {
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login({ email, password });
-      setUser(response.user);
-      setIsAuthenticated(true);
+      if (response.user) {
+        setUser(response.user);
+        setIsAuthenticated(true);
+        // Also verify by calling getCurrentUser to ensure consistency
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      }
       return response;
     } catch (error: any) {
       throw error;
