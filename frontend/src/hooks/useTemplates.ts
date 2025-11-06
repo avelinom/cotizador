@@ -31,6 +31,9 @@ interface UseTemplatesReturn {
   error: string | null;
   fetchTemplates: () => Promise<void>;
   applyTemplate: (proposalId: number, templateId: number) => Promise<{ success: boolean; message?: string }>;
+  createTemplate: (template: Partial<Template>) => Promise<{ success: boolean; message?: string; data?: Template }>;
+  updateTemplate: (id: number, template: Partial<Template>) => Promise<{ success: boolean; message?: string; data?: Template }>;
+  deleteTemplate: (id: number) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const useTemplates = (): UseTemplatesReturn => {
@@ -111,6 +114,123 @@ export const useTemplates = (): UseTemplatesReturn => {
     }
   };
 
+  const createTemplate = async (template: Partial<Template>): Promise<{ success: boolean; message?: string; data?: Template }> => {
+    try {
+      setError(null);
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('No hay token de autenticación');
+      }
+
+      const response = await axios.post(
+        `${getApiBaseUrl()}/templates`,
+        template,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        await fetchTemplates();
+        return {
+          success: true,
+          message: response.data.message || 'Template creado exitosamente',
+          data: response.data.data,
+        };
+      } else {
+        throw new Error(response.data.message || 'Error al crear el template');
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Error al crear el template';
+      setError(errorMessage);
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    }
+  };
+
+  const updateTemplate = async (id: number, template: Partial<Template>): Promise<{ success: boolean; message?: string; data?: Template }> => {
+    try {
+      setError(null);
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('No hay token de autenticación');
+      }
+
+      const response = await axios.put(
+        `${getApiBaseUrl()}/templates/${id}`,
+        template,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        await fetchTemplates();
+        return {
+          success: true,
+          message: response.data.message || 'Template actualizado exitosamente',
+          data: response.data.data,
+        };
+      } else {
+        throw new Error(response.data.message || 'Error al actualizar el template');
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Error al actualizar el template';
+      setError(errorMessage);
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    }
+  };
+
+  const deleteTemplate = async (id: number): Promise<{ success: boolean; message?: string }> => {
+    try {
+      setError(null);
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('No hay token de autenticación');
+      }
+
+      const response = await axios.delete(
+        `${getApiBaseUrl()}/templates/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        await fetchTemplates();
+        return {
+          success: true,
+          message: response.data.message || 'Template eliminado exitosamente',
+        };
+      } else {
+        throw new Error(response.data.message || 'Error al eliminar el template');
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Error al eliminar el template';
+      setError(errorMessage);
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    }
+  };
+
   useEffect(() => {
     fetchTemplates();
   }, []);
@@ -121,6 +241,9 @@ export const useTemplates = (): UseTemplatesReturn => {
     error,
     fetchTemplates,
     applyTemplate,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
   };
 };
 
