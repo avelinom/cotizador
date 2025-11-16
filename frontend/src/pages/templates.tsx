@@ -37,7 +37,7 @@ import {
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import { useTemplates, Template, TemplateSection } from '../hooks/useTemplates';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../utils/dateFormatter';
 
 const TemplatesPage = () => {

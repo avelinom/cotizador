@@ -13,7 +13,7 @@ import {
   Link,
   Grid,
 } from '@mui/material';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
   const router = useRouter();
@@ -27,7 +27,13 @@ export default function Login() {
     name: '',
   });
 
+  // Debug: verificar estado de autenticación
   useEffect(() => {
+    console.log('Login page - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+  }, [isLoading, isAuthenticated]);
+
+  useEffect(() => {
+    // Solo redirigir si ya terminó de cargar y está autenticado
     if (!isLoading && isAuthenticated) {
       router.push('/proposals');
     }
@@ -57,10 +63,7 @@ export default function Login() {
     }
   };
 
-  if (isLoading) {
-    return null;
-  }
-
+  // Mostrar el formulario inmediatamente, sin esperar a que termine la verificación de autenticación
   return (
     <>
       <Head>
@@ -72,11 +75,17 @@ export default function Login() {
           display: 'flex',
           alignItems: 'center',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          position: 'relative',
+          zIndex: 1,
+          pointerEvents: 'auto',
+          '& *': {
+            pointerEvents: 'auto',
+          },
         }}
       >
-        <Container maxWidth="sm">
-          <Card>
-            <CardContent sx={{ p: 4 }}>
+        <Container maxWidth="sm" sx={{ position: 'relative', zIndex: 10 }}>
+          <Card sx={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+            <CardContent sx={{ p: 4, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
               <Typography variant="h4" component="h1" gutterBottom align="center">
                 {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
               </Typography>
@@ -90,7 +99,7 @@ export default function Login() {
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}>
                 {!isLogin && (
                   <TextField
                     fullWidth
@@ -109,6 +118,8 @@ export default function Login() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   margin="normal"
                   required
+                  autoComplete="email"
+                  sx={{ pointerEvents: 'auto' }}
                 />
                 <TextField
                   fullWidth
@@ -118,6 +129,8 @@ export default function Login() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   margin="normal"
                   required
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  sx={{ pointerEvents: 'auto' }}
                 />
                 <Button
                   type="submit"

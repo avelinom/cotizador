@@ -19,7 +19,7 @@ import {
   Style as StyleIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,11 +40,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Cotizador' }) => {
   
   // Check if user is admin
   const isAdmin = user?.role === 'admin' || user?.role === 'manager';
-  
-  // Debug: log user info
-  React.useEffect(() => {
-    console.log('Layout - isAuthenticated:', isAuthenticated, 'user:', user, 'isLoading:', isLoading);
-  }, [user, isAuthenticated, isLoading]);
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     if (newValue === 0) {

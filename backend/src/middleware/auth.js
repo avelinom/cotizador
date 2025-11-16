@@ -27,8 +27,38 @@ const protect = async (req, res, next) => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, config.jwt.secret);
+      // Try to verify with cotizador secret first
+      let decoded;
+      let verified = false;
+      
+      try {
+        decoded = jwt.verify(token, config.jwt.secret);
+        verified = true;
+      } catch (cotizadorError) {
+        // If that fails, try with portal secret (if configured)
+        const portalSecret = process.env.CEFIRO_PORTAL_JWT_SECRET;
+        if (portalSecret && portalSecret !== config.jwt.secret) {
+          try {
+            decoded = jwt.verify(token, portalSecret);
+            // Map portal user structure to cotizador structure if needed
+            if (decoded.role_name) {
+              decoded.role = decoded.role_name;
+            }
+            verified = true;
+            logger.info('Token verified with portal secret');
+          } catch (portalError) {
+            // Continue to throw original error
+            logger.debug('Token verification failed with both secrets');
+          }
+        }
+      }
+      
+      if (!verified || !decoded) {
+        return res.status(401).json({
+          success: false,
+          message: 'No autorizado - Token inválido'
+        });
+      }
       
       // Attach user info to request
       req.user = decoded;
@@ -53,7 +83,8 @@ const protect = async (req, res, next) => {
  * Middleware to check if user is admin
  */
 const requireAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  const userRole = req.user?.role || req.user?.role_name;
+  if (req.user && userRole === 'admin') {
     next();
   } else {
     return res.status(403).json({

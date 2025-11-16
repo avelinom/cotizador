@@ -119,14 +119,23 @@ export const logout = async (): Promise<void> => {
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
     const token = getToken();
-    if (!token) return null;
+    if (!token) {
+      return null;
+    }
 
     const API_URL = getApiUrl();
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
     const response = await fetch(`${API_URL}/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       removeToken();
@@ -144,8 +153,11 @@ export const getCurrentUser = async (): Promise<User | null> => {
       };
     }
     return null;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error getting current user:', error);
+    if (error.name === 'AbortError') {
+      console.error('Auth check timed out');
+    }
     removeToken();
     return null;
   }

@@ -16,6 +16,8 @@ const notFound = require('./middleware/notFound');
 const authRoutes = require('./routes/auth');
 const proposalsRoutes = require('./routes/proposals');
 const templatesRoutes = require('./routes/templates');
+const googleOAuthRoutes = require('./routes/googleOAuth');
+const googleDriveRoutes = require('./routes/googleDrive');
 
 const app = express();
 
@@ -33,7 +35,9 @@ app.use(helmet({
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3006',
-    'http://localhost:3006'
+    'http://localhost:3006',
+    'http://localhost:3003', // Portal de Cefiro
+    process.env.CEFIRO_PORTAL_URL || 'http://localhost:3003'
   ],
   credentials: true
 }));
@@ -73,6 +77,8 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/proposals', proposalsRoutes);
 app.use('/api/templates', templatesRoutes);
+app.use('/api/google-oauth', googleOAuthRoutes);
+app.use('/api/google-drive', googleDriveRoutes);
 
 // Error handling middleware
 app.use(notFound);

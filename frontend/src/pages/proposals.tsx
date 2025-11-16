@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import {
   Box,
   Button,
@@ -39,9 +40,13 @@ import {
 import Layout from '../components/Layout';
 import { useProposals, Proposal, ProposalSection } from '../hooks/useProposals';
 import { useTemplates, Template } from '../hooks/useTemplates';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../utils/dateFormatter';
 
 const ProposalsPage = () => {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  
   const {
     proposals,
     loading,
@@ -91,6 +96,15 @@ const ProposalsPage = () => {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    // Solo redirigir si ya terminó de cargar y no está autenticado
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/login');
+      }
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleOpenUploadModal = () => {
     setUploadForm({ title: '', description: '' });
@@ -257,7 +271,30 @@ const ProposalsPage = () => {
     }
   };
 
+  // Mostrar loading solo mientras carga la autenticación inicial
   if (!isClient) {
+    return (
+      <Layout title="Cotizador">
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Layout>
+    );
+  }
+
+  // Si está cargando autenticación, mostrar loading pero no bloquear completamente
+  if (authLoading) {
+    return (
+      <Layout title="Cotizador">
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Layout>
+    );
+  }
+
+  // Si no está autenticado después de cargar, redirigir (el useEffect ya lo maneja)
+  if (!isAuthenticated) {
     return (
       <Layout title="Cotizador">
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">

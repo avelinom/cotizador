@@ -16,7 +16,28 @@ export const useAuth = () => {
   const checkAuth = async () => {
     try {
       setIsLoading(true);
-      const currentUser = await authService.getCurrentUser();
+      
+      // Verificar si hay token primero (más rápido)
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('cotizador_token');
+        if (!token) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Agregar timeout para evitar que se quede bloqueado
+      const timeoutPromise = new Promise<User | null>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+      
+      const currentUser = await Promise.race([
+        authService.getCurrentUser(),
+        timeoutPromise
+      ]) as User | null;
+      
       if (currentUser) {
         setUser(currentUser);
         setIsAuthenticated(true);
@@ -24,7 +45,8 @@ export const useAuth = () => {
         setUser(null);
         setIsAuthenticated(false);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error checking auth:', error);
       setUser(null);
       setIsAuthenticated(false);
     } finally {
