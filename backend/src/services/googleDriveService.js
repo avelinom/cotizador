@@ -349,14 +349,13 @@ class GoogleDriveService {
           const cleanedTitle = this.cleanSectionContent(rawTitle);
           const title = cleanedTitle || `Sección ${order}`;
           
-          // Clean the initial content line
-          const cleanedText = this.cleanSectionContent(text);
-          
+          // Start new section with empty content (title is separate)
           currentSection = {
             order: order,
             title: title,
-            content: cleanedText + '\n',
-            startIndex: element.startIndex || null
+            content: '', // Content will be added in subsequent paragraphs
+            startIndex: element.startIndex || null,
+            isDynamic: null // Will be determined from content
           };
         } else if (currentSection) {
           // Add to current section (clean content to remove labels)
@@ -370,7 +369,8 @@ class GoogleDriveService {
               order: 0,
               title: 'Introducción',
               content: cleanedText + '\n',
-              startIndex: element.startIndex || null
+              startIndex: element.startIndex || null,
+              isDynamic: null // Will be determined from content
             };
           }
         }
@@ -387,6 +387,25 @@ class GoogleDriveService {
 
     // Sort by order
     sections.sort((a, b) => a.order - b.order);
+
+    // Determine isDynamic based on content marker "NO será editado"
+    for (const section of sections) {
+      if (section.isDynamic === null) {
+        // Check if content contains "NO será editado" marker
+        const hasNoEditMarker = section.content && 
+          /NO\s+ser[áa]\s+editado/i.test(section.content);
+        
+        // If it has the marker, it's static (not editable)
+        // If it doesn't have the marker, it's dynamic (editable)
+        section.isDynamic = !hasNoEditMarker;
+        
+        if (hasNoEditMarker) {
+          logger.info(`   Sección ${section.order} "${section.title}": Marcada como ESTÁTICA (contiene "NO será editado")`);
+        } else {
+          logger.info(`   Sección ${section.order} "${section.title}": Marcada como DINÁMICA (editable)`);
+        }
+      }
+    }
 
     logger.info(`📋 Secciones extraídas: ${sections.length}`);
     return sections;
@@ -408,6 +427,90 @@ class GoogleDriveService {
     }
 
     return text;
+  }
+
+  /**
+   * Extract variables from content (format: [VARIABLE_NAME])
+   * Returns array of unique variable names found
+   */
+  extractVariables(content) {
+    if (!content || typeof content !== 'string') {
+      return [];
+    }
+
+    // Match patterns like [VARIABLE_NAME] or [VARIABLE NAME] (with spaces)
+    const variablePattern = /\[([A-Z_][A-Z0-9_\s]+)\]/gi;
+    const matches = content.matchAll(variablePattern);
+    const variables = new Set();
+
+    for (const match of matches) {
+      if (match[1]) {
+        // Normalize: convert to uppercase and replace spaces with underscores
+        const normalized = match[1].trim().toUpperCase().replace(/\s+/g, '_');
+        variables.add(normalized);
+      }
+    }
+
+    return Array.from(variables);
+  }
+
+  /**
+   * Replace variables in content with actual values
+   * @param {string} content - Content with variables like [VARIABLE_NAME]
+   * @param {Object} variableValues - Object with variable values { VARIABLE_NAME: 'value' }
+   * @returns {string} - Content with variables replaced
+   */
+  replaceVariables(content, variableValues = {}) {
+    if (!content || typeof content !== 'string') {
+      return content;
+    }
+
+    if (!variableValues || Object.keys(variableValues).length === 0) {
+      logger.warn('⚠️ replaceVariables llamado sin variableValues');
+      return content;
+    }
+
+    let replacedContent = content;
+    let replacementsMade = 0;
+
+    // Replace each variable
+    for (const [variableName, value] of Object.entries(variableValues)) {
+      if (value === null || value === undefined || value === '') {
+        continue; // Skip if value is not provided
+      }
+
+      // Normalize variable name to uppercase
+      const normalizedName = variableName.toUpperCase().replace(/\s+/g, '_');
+      
+      // Create patterns for both [VARIABLE_NAME] and [VARIABLE NAME] formats
+      const withUnderscores = normalizedName;
+      const withSpaces = normalizedName.replace(/_/g, ' ');
+
+      // Escape special regex characters
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Replace both formats
+      const pattern1 = new RegExp(`\\[${escapeRegex(withUnderscores)}\\]`, 'gi');
+      const pattern2 = new RegExp(`\\[${escapeRegex(withSpaces)}\\]`, 'gi');
+
+      const beforeReplace = replacedContent;
+      replacedContent = replacedContent.replace(pattern1, value);
+      replacedContent = replacedContent.replace(pattern2, value);
+      
+      if (beforeReplace !== replacedContent) {
+        replacementsMade++;
+        logger.info(`   🔄 Reemplazado [${withUnderscores}] o [${withSpaces}] con "${value}"`);
+      }
+    }
+
+    if (replacementsMade > 0) {
+      logger.info(`   ✅ Total de reemplazos realizados: ${replacementsMade}`);
+    } else {
+      logger.warn(`   ⚠️ No se realizaron reemplazos. Variables disponibles: ${Object.keys(variableValues).join(', ')}`);
+      logger.warn(`   ⚠️ Contenido preview: ${content.substring(0, 200)}...`);
+    }
+
+    return replacedContent;
   }
 
   /**
@@ -807,7 +910,7 @@ class GoogleDriveService {
    * Creates a new document with static sections complete and dynamic sections empty
    * @param {Array} templateSections - Optional array of template sections with isStatic/isDynamic flags
    */
-  async mergeSectionsWithEmptyDynamic(staticDocId, dynamicDocId, outputName, destinationFolderId, templateSections = []) {
+  async mergeSectionsWithEmptyDynamic(staticDocId, dynamicDocId, outputName, destinationFolderId, templateSections = [], variableValues = {}) {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -829,6 +932,12 @@ class GoogleDriveService {
       const dynamicSections = this.extractSections(dynamicDoc);
 
       logger.info(`📊 Secciones estáticas: ${staticSections.length}, dinámicas: ${dynamicSections.length}`);
+      
+      // Log content preview for debugging
+      staticSections.forEach(section => {
+        const contentPreview = section.content ? section.content.substring(0, 100) : '(vacío)';
+        logger.info(`   Sección estática ${section.order}: "${section.title}" - Contenido (${section.content?.length || 0} chars): ${contentPreview}...`);
+      });
 
       // Create a map of template sections by order to identify which are dynamic
       const templateSectionMap = new Map();
@@ -843,10 +952,11 @@ class GoogleDriveService {
       const mergedSections = [];
       
       // Add all static sections with their content
+      // Use templateSections to determine which are static vs dynamic
       for (const staticSection of staticSections) {
         // Check template to see if this section is marked as dynamic
         const templateSection = templateSectionMap.get(staticSection.order);
-        const isDynamic = templateSection ? (templateSection.isDynamic || !templateSection.isStatic) : false;
+        const isDynamic = templateSection ? (templateSection.isDynamic === true) : false;
         
         // Clean content to remove classification labels
         const cleanedContent = this.cleanSectionContent(staticSection.content);
@@ -858,35 +968,40 @@ class GoogleDriveService {
           content: cleanedContent,
           isStatic: !isDynamic // If marked as dynamic in template, it's not static
         });
+        
+        if (isDynamic) {
+          logger.info(`   Sección ${staticSection.order} "${cleanedTitle}": DINÁMICA (editable) - contenido estático conservado (${cleanedContent?.length || 0} chars)`);
+        } else {
+          logger.info(`   Sección ${staticSection.order} "${cleanedTitle}": ESTÁTICA (no editable) - contenido completo (${cleanedContent?.length || 0} chars)`);
+        }
       }
       
-      // Add dynamic sections with empty content (keep structure)
+      // Process dynamic sections: update isStatic flag based on "NO será editado" marker
+      // The isDynamic flag from extractSections is already set correctly
       for (const dynamicSection of dynamicSections) {
         // Check if we already have a section with this order (from static)
         const existing = mergedSections.find(s => s.order === dynamicSection.order);
         if (!existing) {
-          // Check template to confirm this is dynamic
-          const templateSection = templateSectionMap.get(dynamicSection.order);
-          const isDynamic = templateSection ? (templateSection.isDynamic || !templateSection.isStatic) : true; // Default to dynamic if not in template
-          
-          // Clean title to remove classification labels
+          // Section only in dynamic doc (shouldn't happen, but handle it)
           const cleanedTitle = this.cleanSectionContent(dynamicSection.title);
-          
-          // Add dynamic section with empty content
           mergedSections.push({
             order: dynamicSection.order,
             title: cleanedTitle,
-            content: '', // Empty content for dynamic sections
-            isStatic: !isDynamic
+            content: '', // Empty if only in dynamic doc
+            isStatic: !dynamicSection.isDynamic // Use isDynamic flag from extractSections
           });
         } else {
-          // Update existing section if template says it's dynamic
-          const templateSection = templateSectionMap.get(dynamicSection.order);
-          if (templateSection && (templateSection.isDynamic || !templateSection.isStatic)) {
-            existing.isStatic = false;
-            existing.content = ''; // Clear content for dynamic sections
-            // Also clean the title if it has labels
-            existing.title = this.cleanSectionContent(existing.title);
+          // Section exists in both: use isDynamic flag from dynamic document
+          // This flag is set based on "NO será editado" marker
+          const isDynamic = dynamicSection.isDynamic === true;
+          existing.isStatic = !isDynamic;
+          
+          if (isDynamic) {
+            // Dynamic section: keep static content as initial (editable later)
+            logger.info(`   Sección ${existing.order} "${existing.title}": DINÁMICA (editable) - conservando contenido estático (${existing.content?.length || 0} chars)`);
+          } else {
+            // Static section: keep static content (not editable)
+            logger.info(`   Sección ${existing.order} "${existing.title}": ESTÁTICA (no editable) - conservando contenido completo (${existing.content?.length || 0} chars)`);
           }
         }
       }
@@ -917,16 +1032,63 @@ class GoogleDriveService {
 
       // Insert merged sections (static with content, dynamic empty)
       let insertionIndex = 1;
+      logger.info(`📝 Insertando ${mergedSections.length} secciones en documento...`);
+      
+      // Extract all variables from all sections to log them
+      const allVariables = new Set();
       for (const section of mergedSections) {
-        // Insert section title
-        const titleText = `${section.order}. ${section.title}\n`;
-        await googleDocsService.insertText(baseDoc.id, insertionIndex, titleText);
-        insertionIndex += titleText.length;
-        
-        // Insert section content (empty for dynamic sections)
         if (section.content) {
-          await googleDocsService.insertText(baseDoc.id, insertionIndex, section.content);
-          insertionIndex += section.content.length;
+          const sectionVars = this.extractVariables(section.content);
+          sectionVars.forEach(v => allVariables.add(v));
+        }
+      }
+      if (allVariables.size > 0) {
+        logger.info(`   🔍 Variables detectadas en documentos: ${Array.from(allVariables).join(', ')}`);
+        logger.info(`   📋 Valores disponibles: ${Object.keys(variableValues).join(', ')}`);
+        logger.info(`   📋 Valores completos:`, JSON.stringify(variableValues, null, 2));
+      } else {
+        logger.info(`   ℹ️ No se detectaron variables en los documentos`);
+      }
+      
+      for (const section of mergedSections) {
+        if (section.order === 0) {
+          // Section 0 (Introduction) - no numbered title, just content
+          if (section.content && section.content.trim()) {
+            // Replace variables in content
+            const contentWithVariables = this.replaceVariables(section.content.trim(), variableValues);
+            const contentText = contentWithVariables + '\n\n';
+            logger.info(`   ✏️ Sección 0: Insertando ${contentText.length} caracteres de contenido (con variables reemplazadas)`);
+            await googleDocsService.insertText(baseDoc.id, insertionIndex, contentText);
+            insertionIndex += contentText.length;
+          } else {
+            logger.warn(`   ⚠️ Sección 0: Sin contenido para insertar`);
+          }
+        } else {
+          // Numbered sections - insert title first
+          const titleText = `${section.order}. ${section.title}\n\n`;
+          logger.info(`   ✏️ Sección ${section.order}: Insertando título "${section.title}"`);
+          await googleDocsService.insertText(baseDoc.id, insertionIndex, titleText);
+          insertionIndex += titleText.length;
+          
+          // Insert section content (empty for dynamic sections)
+          if (section.content && section.content.trim()) {
+            // Replace variables in content
+            const originalContent = section.content.trim();
+            const contentWithVariables = this.replaceVariables(originalContent, variableValues);
+            const contentText = contentWithVariables + '\n\n';
+            
+            // Log if variables were actually replaced
+            if (originalContent !== contentWithVariables) {
+              logger.info(`   ✏️ Sección ${section.order}: Variables reemplazadas - ${contentText.length} caracteres`);
+            } else {
+              logger.info(`   ✏️ Sección ${section.order}: ${contentText.length} caracteres (sin variables o no reemplazadas)`);
+            }
+            logger.info(`      Preview: ${contentText.substring(0, 100)}...`);
+            await googleDocsService.insertText(baseDoc.id, insertionIndex, contentText);
+            insertionIndex += contentText.length;
+          } else {
+            logger.info(`   ℹ️ Sección ${section.order}: Sin contenido (sección dinámica vacía)`);
+          }
         }
       }
 

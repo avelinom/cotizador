@@ -29,6 +29,18 @@ const config = {
 
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000'
+  },
+
+  google: {
+    // Google Drive Service Account Configuration
+    projectId: process.env.GOOGLE_PROJECT_ID || '',
+    clientEmail: process.env.GOOGLE_CLIENT_EMAIL || '',
+    privateKey: process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : '',
+    privateKeyId: process.env.GOOGLE_PRIVATE_KEY_ID || '',
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientCertUrl: process.env.GOOGLE_CLIENT_CERT_URL || '',
+    // Google Drive Folder IDs
+    driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || ''
   }
 };
 

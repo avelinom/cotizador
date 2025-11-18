@@ -215,6 +215,56 @@ class GoogleDocsService {
   }
 
   /**
+   * Extract table data from a Google Doc
+   * Returns array of rows, each row is an array of cell values
+   */
+  extractTableData(docData) {
+    if (!docData.body || !docData.body.content) {
+      return [];
+    }
+
+    const tables = [];
+    
+    const extractTextFromCell = (cell) => {
+      let text = '';
+      if (cell.content) {
+        for (const element of cell.content) {
+          if (element.paragraph) {
+            if (element.paragraph.elements) {
+              for (const paraElement of element.paragraph.elements) {
+                if (paraElement.textRun) {
+                  text += paraElement.textRun.content || '';
+                }
+              }
+            }
+          }
+        }
+      }
+      return text.trim();
+    };
+
+    for (const element of docData.body.content) {
+      if (element.table) {
+        const table = [];
+        for (const row of element.table.tableRows || []) {
+          const rowData = [];
+          for (const cell of row.tableCells || []) {
+            rowData.push(extractTextFromCell(cell));
+          }
+          if (rowData.length > 0) {
+            table.push(rowData);
+          }
+        }
+        if (table.length > 0) {
+          tables.push(table);
+        }
+      }
+    }
+
+    return tables.length > 0 ? tables[0] : []; // Return first table
+  }
+
+  /**
    * Extract text content from a Google Doc
    */
   extractTextFromDocument(docData) {

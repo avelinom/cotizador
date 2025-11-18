@@ -407,15 +407,115 @@ const createProposalFromDocuments = async (req, res) => {
     const dynamicDoc = await googleDocsService.getDocumentContent(dynamicDocumentId);
     const dynamicSections = googleDriveService.extractSections(dynamicDoc);
     
-    // Create template sections array for mergeSectionsWithEmptyDynamic
-    const templateSections = staticSections.map((section) => ({
-      order: section.order,
-      title: section.title,
-      isStatic: !dynamicSections.some((ds) => ds.order === section.order),
-      isDynamic: dynamicSections.some((ds) => ds.order === section.order)
-    }));
+        // Create template sections array for mergeSectionsWithEmptyDynamic
+        // Use the isDynamic flag from dynamic document sections (based on "NO será editado" marker)
+        const templateSections = staticSections.map((section) => {
+          // Find corresponding dynamic section
+          const dynamicSection = dynamicSections.find((ds) => ds.order === section.order);
+          
+          // If section exists in dynamic doc, use its isDynamic flag
+          // If it doesn't exist in dynamic doc, it's static (not editable)
+          const isDynamic = dynamicSection ? (dynamicSection.isDynamic === true) : false;
+          
+          return {
+            order: section.order,
+            title: section.title,
+            isStatic: !isDynamic,
+            isDynamic: isDynamic
+          };
+        });
 
-    logger.info(`📊 Secciones identificadas: ${staticSections.length} total, ${templateSections.filter((s) => s.isDynamic).length} dinámicas`);
+        const dynamicCount = templateSections.filter((s) => s.isDynamic).length;
+        const staticCount = templateSections.filter((s) => s.isStatic).length;
+        logger.info(`📊 Secciones identificadas: ${staticSections.length} total, ${dynamicCount} dinámicas (editables), ${staticCount} estáticas (no editables)`);
+
+    // Extract variables from static document content
+    const allVariables = new Set();
+    for (const section of staticSections) {
+      if (section.content) {
+        const sectionVars = googleDriveService.extractVariables(section.content);
+        sectionVars.forEach(v => allVariables.add(v));
+      }
+    }
+    logger.info(`🔍 Variables detectadas en documento estático: ${Array.from(allVariables).join(', ')}`);
+
+    // Build variable values object from request
+    // Automatic variables (from request data)
+    const variableValues = {
+      NOMBRE_CLIENTE: clientName,
+      TIPO_PROPUESTA: proposalType || '',
+      FECHA: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      AÑO: new Date().getFullYear().toString(),
+      MES: new Date().toLocaleDateString('es-ES', { month: 'long' })
+    };
+
+    // Variables from request body (user-provided)
+    logger.info('📥 Variables recibidas en request body:', JSON.stringify(req.body, null, 2));
+    
+    const {
+      duracion,
+      tiempo_fase1,
+      tiempo_fase2,
+      tiempo_fase3,
+      tiempo_fase4,
+      tiempo_fase5,
+      periodo_garantia,
+      periodo_soporte,
+      recurso,
+      recursos
+    } = req.body;
+
+    // Map request variables to standard format
+    if (duracion) {
+      variableValues.DURACION = duracion;
+      logger.info(`   ✅ DURACION = "${duracion}"`);
+    }
+    if (tiempo_fase1) {
+      variableValues.TIEMPO_FASE1 = tiempo_fase1;
+      logger.info(`   ✅ TIEMPO_FASE1 = "${tiempo_fase1}"`);
+    }
+    if (tiempo_fase2) {
+      variableValues.TIEMPO_FASE2 = tiempo_fase2;
+      logger.info(`   ✅ TIEMPO_FASE2 = "${tiempo_fase2}"`);
+    }
+    if (tiempo_fase3) {
+      variableValues.TIEMPO_FASE3 = tiempo_fase3;
+      logger.info(`   ✅ TIEMPO_FASE3 = "${tiempo_fase3}"`);
+    }
+    if (tiempo_fase4) {
+      variableValues.TIEMPO_FASE4 = tiempo_fase4;
+      logger.info(`   ✅ TIEMPO_FASE4 = "${tiempo_fase4}"`);
+    }
+    if (tiempo_fase5) {
+      variableValues.TIEMPO_FASE5 = tiempo_fase5;
+      logger.info(`   ✅ TIEMPO_FASE5 = "${tiempo_fase5}"`);
+    }
+    if (periodo_garantia) {
+      variableValues.PERIODO_GARANTIA = periodo_garantia;
+      logger.info(`   ✅ PERIODO_GARANTIA = "${periodo_garantia}"`);
+    }
+    if (periodo_soporte) {
+      variableValues.PERIODO_SOPORTE = periodo_soporte;
+      logger.info(`   ✅ PERIODO_SOPORTE = "${periodo_soporte}"`);
+    }
+    if (recurso) {
+      variableValues.RECURSO = recurso;
+      logger.info(`   ✅ RECURSO = "${recurso}"`);
+    }
+    if (recursos) {
+      variableValues.RECURSOS = recursos;
+      logger.info(`   ✅ RECURSOS = "${recursos}"`);
+    }
+
+    // Log which variables will be replaced
+    const variablesToReplace = Object.keys(variableValues);
+    const missingVariables = Array.from(allVariables).filter(v => !variableValues[v]);
+    if (variablesToReplace.length > 0) {
+      logger.info(`📋 Variables que serán reemplazadas: ${variablesToReplace.join(', ')}`);
+    }
+    if (missingVariables.length > 0) {
+      logger.warn(`⚠️ Variables sin valor asignado (se dejarán como están): ${missingVariables.join(', ')}`);
+    }
 
     // Merge sections (static complete, dynamic empty)
     logger.info('🔄 Fusionando secciones (dinámicas vacías)...');
@@ -424,7 +524,8 @@ const createProposalFromDocuments = async (req, res) => {
       dynamicDocumentId,
       documentName,
       inProgressFolder.id,
-      templateSections
+      templateSections,
+      variableValues // Pass variable values for replacement
     );
 
     // Validate clientId - if it's a UUID (string with dashes), set to null
@@ -461,7 +562,8 @@ const createProposalFromDocuments = async (req, res) => {
         dynamicDocumentId,
         inProgressFolderId: inProgressFolder.id,
         createdFrom: 'direct_documents',
-        proposalId
+        proposalId,
+        variableValues: variableValues // Save variable values for later use
       }),
       sections: JSON.stringify(mergedDoc.sections || []),
       created_at: new Date(),
@@ -1325,30 +1427,13 @@ const getSectionContent = async (req, res) => {
       actualContent = section.content || '';
     }
 
-    // Export section as HTML for formatted display
-    try {
-      // Use Google Docs API to export the section range as HTML
-      const exportResponse = await googleDocsService.docs.documents.export({
-        documentId: proposal.google_doc_id,
-        mimeType: 'text/html'
-      });
-
-      // Return the actual content extracted
-      res.json({
-        success: true,
-        content: actualContent,
-        html: null // Can be enhanced later to return formatted HTML
-      });
-    } catch (exportError) {
-      // Fallback to text content if HTML export fails
-      logger.warn('Error exporting section as HTML, using text content:', exportError);
-      
-      res.json({
-        success: true,
-        content: actualContent,
-        html: null
-      });
-    }
+    // Return the actual content extracted
+    // Note: HTML export would require using Drive API files.export, but for now we return text content
+    res.json({
+      success: true,
+      content: actualContent,
+      html: null // Can be enhanced later to return formatted HTML using Drive API
+    });
   } catch (error) {
     logger.error('❌ Error obteniendo contenido de sección:', error);
     res.status(500).json({
