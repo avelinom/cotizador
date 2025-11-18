@@ -29,7 +29,7 @@ class GoogleDriveService {
       }
 
       // Fallback to Service Account
-      const { googleDocsService } = require('./googleDocsService');
+      const googleDocsService = require('./googleDocsService');
       await googleDocsService.initialize();
       if (googleDocsService.drive) {
         this.drive = googleDocsService.drive;

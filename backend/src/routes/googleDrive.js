@@ -4,7 +4,58 @@ const googleDriveService = require('../services/googleDriveService');
 const logger = require('../utils/logger');
 const { protect } = require('../middleware/auth');
 
-// All routes require authentication
+// Health check endpoint (no authentication required)
+router.get('/health', async (req, res) => {
+  try {
+    const hasProjectId = !!process.env.GOOGLE_PROJECT_ID;
+    const hasClientEmail = !!process.env.GOOGLE_CLIENT_EMAIL;
+    const hasPrivateKey = !!process.env.GOOGLE_PRIVATE_KEY;
+    
+    const credentialsConfigured = hasProjectId && hasClientEmail && hasPrivateKey;
+    
+    // Try to initialize if credentials are configured
+    let initialized = false;
+    let initializationError = null;
+    
+    if (credentialsConfigured) {
+      try {
+        if (!googleDriveService.initialized) {
+          await googleDriveService.initialize();
+        }
+        initialized = googleDriveService.initialized;
+      } catch (error) {
+        initializationError = error.message;
+        logger.error('Error inicializando Google Drive en health check:', error);
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        credentials: {
+          GOOGLE_PROJECT_ID: hasProjectId,
+          GOOGLE_CLIENT_EMAIL: hasClientEmail,
+          GOOGLE_PRIVATE_KEY: hasPrivateKey,
+          allConfigured: credentialsConfigured
+        },
+        service: {
+          initialized: initialized,
+          error: initializationError
+        },
+        status: credentialsConfigured && initialized ? 'ready' : credentialsConfigured ? 'credentials_ok_but_not_initialized' : 'missing_credentials'
+      }
+    });
+  } catch (error) {
+    logger.error('Error en health check de Google Drive:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verificando estado de Google Drive',
+      error: error.message
+    });
+  }
+});
+
+// All other routes require authentication
 router.use(protect);
 
 /**
